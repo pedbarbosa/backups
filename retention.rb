@@ -31,9 +31,8 @@ def same_day_as_last_backup?(timestamp)
 end
 
 def same_month_as_last_backup?(timestamp)
-  current = Time.at(timestamp)
-  last = Time.at(@last_backup_kept)
-  current.year == last.year && current.month == last.month
+  Time.at(timestamp).year == Time.at(@last_backup_kept).year &&
+    Time.at(timestamp).month == Time.at(@last_backup_kept).month
 end
 
 def build_filename_hash(filename)
@@ -51,6 +50,8 @@ def backup_list(folder)
     next if filename == '.DS_Store'
 
     backups << build_filename_hash(filename)
+  rescue ArgumentError
+    puts "Failed to retrieve timestamp for '#{filename}', ignoring ..."
   end
   backups
 end
@@ -106,7 +107,7 @@ def find_files_to_delete(backups)
 end
 
 # Enter folder to process
-folder = 'Backups'
+folder = 'Machines'
 
 @last_backup_kept = nil
 backups = backup_list(folder)
