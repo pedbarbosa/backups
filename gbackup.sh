@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-log() { echo "[`date +%H:%M:%S`] $@" >> ${LOGFILE}; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $@" >> "${LOGFILE}"; }
 
 archive() {
     LOG_MSG=$(tar jcf "${ARCHIVE}" -h -P ${TARGETS} 2>&1)
@@ -30,7 +30,7 @@ determine_dir() {
     if [[ ! ${ZSH_VERSION} ]]; then
         SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
     else
-        SCRIPT_DIR=`dirname $0`
+        SCRIPT_DIR=$(dirname $0)
     fi
 }
 
@@ -48,6 +48,8 @@ perform_backup() {
     UNAME=$(uname -a | sed -E 's/ .*//')
     if [[ ${UNAME} == 'Darwin' ]]; then
         mac_backup
+    elif [[ "$(< /proc/version)" == *@(Microsoft|WSL)* ]]; then
+        wsl_backup
     elif [[ ${UNAME} == 'Linux' ]]; then
         linux_backup
     else
@@ -58,11 +60,15 @@ perform_backup() {
 
 mac_backup() {
     if [[ ! -d ${FOLDER} ]]; then
-        mkdir ${FOLDER}
+        mkdir "${FOLDER}"
     fi
 
     ARCHIVE=${SCRIPT_DIR}/${FOLDER}/${BOX}-${TIMESTAMP}.bz2
     archive
+}
+
+wsl_backup() {
+  mac_backup
 }
 
 linux_backup() {
