@@ -48,8 +48,6 @@ perform_backup() {
     UNAME=$(uname -a | sed -E 's/ .*//')
     if [[ ${UNAME} == 'Darwin' ]]; then
         mac_backup
-    elif [[ "$(< /proc/version)" == *@(Microsoft|WSL)* ]]; then
-        wsl_backup
     elif [[ ${UNAME} == 'Linux' ]]; then
         linux_backup
     else
@@ -65,10 +63,6 @@ mac_backup() {
 
     ARCHIVE=${SCRIPT_DIR}/${FOLDER}/${BOX}-${TIMESTAMP}.bz2
     archive
-}
-
-wsl_backup() {
-  mac_backup
 }
 
 linux_backup() {
