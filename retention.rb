@@ -4,7 +4,7 @@
 require 'time'
 
 def scan_directory(folder)
-  Dir.entries(folder).reject { |entry| entry =~ /^\.{1,2}$/ }.sort
+  Dir.entries(folder).grep_v(/^\.{1,2}$/).sort
 end
 
 def get_hostname(filename)
@@ -37,7 +37,7 @@ end
 
 def build_filename_hash(filename)
   {
-    filename: filename,
+    filename:,
     hostname: get_hostname(filename),
     timestamp: get_timestamp(filename)
   }
