@@ -3,7 +3,19 @@
 
 require 'time'
 
+# Raise error if directory does not exist
+class DirectoryNotFound < StandardError
+  def initialize(msg = 'Directory not found')
+    super(msg)
+  end
+end
+
 def scan_directory(folder)
+  unless File.directory?(folder)
+    puts "ERROR: Directory '#{folder}' does not exist!"
+    raise DirectoryNotFound
+  end
+
   Dir.entries(folder).grep_v(/^\.{1,2}$/).sort
 end
 
@@ -116,6 +128,6 @@ files_to_delete = find_files_to_delete(backups)
 backups.each do |backup|
   if files_to_delete.include?(backup[:filename])
     puts "Deleting #{backup[:filename]} ..."
-    #File.delete("#{folder}/#{backup[:filename]}")
+    File.delete("#{folder}/#{backup[:filename]}")
   end
 end
