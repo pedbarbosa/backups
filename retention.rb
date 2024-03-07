@@ -15,7 +15,6 @@ def scan_directory(folder)
     puts "ERROR: Directory '#{folder}' does not exist!"
     raise DirectoryNotFound
   end
-
   Dir.entries(folder).grep_v(/^\.{1,2}$/).sort
 end
 
