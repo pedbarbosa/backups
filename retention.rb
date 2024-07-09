@@ -37,6 +37,10 @@ def get_date(timestamp)
   Time.at(timestamp).to_date
 end
 
+def oldest_backup?(timestamp)
+  update_last_backup_kept(timestamp) if @last_backup_kept.nil?
+end
+
 def same_day_as_last_backup?(timestamp)
   get_date(timestamp) == get_date(@last_backup_kept)
 end
@@ -81,52 +85,84 @@ def build_host_list_and_report(backups, host)
   host_backups
 end
 
-def first_backup_kept?(timestamp)
-  update_last_backup_kept(timestamp) if @last_backup_kept.nil?
+def keep_first_of_the_month(backup, files_to_delete)
+  if same_month_as_last_backup?(backup[:timestamp])
+    files_to_delete << backup[:filename]
+  else
+    update_last_backup_kept(backup[:timestamp])
+  end
+end
+
+def keep_first_of_the_day(backup, files_to_delete)
+  if same_day_as_last_backup?(backup[:timestamp])
+    files_to_delete << backup[:filename]
+  else
+    update_last_backup_kept(backup[:timestamp])
+  end
 end
 
 def find_files_to_delete(backups)
   files_to_delete = []
   host_list(backups).each do |host|
+    @last_backup_kept = nil
     build_host_list_and_report(backups, host).each do |backup|
-      timestamp = backup[:timestamp]
-      filename = backup[:filename]
+      # Keep if it's the oldest backup
+      next if oldest_backup?(backup[:timestamp])
 
       # Files newer than 7 days should be kept
-      next if last_x_days?(timestamp, 7)
+      next if last_x_days?(backup[:timestamp], 7)
 
       # Files older than 365 days should be deleted
-      unless last_x_days?(timestamp, 365)
-        files_to_delete << filename
+      unless last_x_days?(backup[:timestamp], 365)
+        files_to_delete << backup[:filename]
         next
       end
 
-      # Keep if it's the first backup (< 365 days and > 7 days)
-      next if first_backup_kept?(timestamp)
-
       # If older than 90 days, keep the first of the month
-      unless last_x_days?(timestamp, 90)
-        same_month_as_last_backup?(timestamp) ? files_to_delete << filename : update_last_backup_kept(timestamp)
+      unless last_x_days?(backup[:timestamp], 90)
+        keep_first_of_the_month(backup, files_to_delete)
         next
       end
 
       # Remaining - newer than 90 days but older than 7 days, keep first of the day
-      same_day_as_last_backup?(timestamp) ? files_to_delete << filename : update_last_backup_kept(timestamp)
+      keep_first_of_the_day(backup, files_to_delete)
     end
   end
   files_to_delete
 end
 
-# Enter folder to process
-folder = 'Machines'
+def find_folder_to_process
+  BACKUP_FOLDER_OPTIONS.each do |directory|
+    if File.directory?(directory)
+      puts "Using '#{directory}' for processing ..."
+      return directory
+    end
+  end
 
-@last_backup_kept = nil
-backups = backup_list(folder)
-files_to_delete = find_files_to_delete(backups)
+  puts "Couldn't find folder to process. Exiting ..."
+  exit 1
+end
 
-backups.each do |backup|
-  if files_to_delete.include?(backup[:filename])
-    puts "Deleting #{backup[:filename]} ..."
-    File.delete("#{folder}/#{backup[:filename]}")
+def find_backups
+  folder = find_folder_to_process
+  backup_list(folder)
+end
+
+def delete_backups(backups, files_to_delete)
+  backups.each do |backup|
+    if files_to_delete.include?(backup[:filename])
+      puts "Deleting #{backup[:filename]} ..."
+      # File.delete("#{folder}/#{backup[:filename]}")
+    end
   end
 end
+
+def process_backups
+  backups = find_backups
+  files_to_delete = find_files_to_delete(backups)
+  delete_backups(backups, files_to_delete)
+end
+
+BACKUP_FOLDER_OPTIONS = ['Machines', "#{Dir.home}/Google Drive/My Drive/Backups/Machines"].freeze
+
+process_backups
