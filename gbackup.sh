@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $@" >> "${LOGFILE}"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $@" >>"${LOGFILE}"; }
 
 archive() {
-    LOG_MSG=$(tar jcf "${ARCHIVE}" -h -P ${TARGETS} 2>&1)
-    if [[ $? -eq 0 ]]; then
+    ARCHIVE="/tmp/${BOX}-${TIMESTAMP}.bz2"
+
+    if LOG_MSG=$(tar jcf "$ARCHIVE" -P "$TARGETS" 2>&1); then
         log "Backup file '${ARCHIVE}' created successfully."
     else
         log "Backup file '${ARCHIVE}' failed to create."
         log "Tar command output: ${LOG_MSG}"
+        exit 1
+    fi
+
+    if mv "$ARCHIVE" "$FOLDER/"; then
+        log "Backup file '${ARCHIVE}' moved to '${FOLDER}'."
+    else
+        log "Backup file '${ARCHIVE}' failed to move to '${FOLDER}'."
         exit 1
     fi
 }
@@ -28,9 +36,9 @@ determine_host() {
 
 determine_dir() {
     if [[ ! ${ZSH_VERSION} ]]; then
-        SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+        SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
     else
-        SCRIPT_DIR=$(dirname $0)
+        SCRIPT_DIR=$(dirname "$0")
     fi
 }
 
@@ -38,6 +46,10 @@ perform_backup() {
     determine_host
     determine_dir
     TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
+
+    if [[ ! -d ${FOLDER} ]]; then
+        mkdir -p "${SCRIPT_DIR}/${FOLDER}"
+    fi
 
     for i in ${ALLTARGETS}; do
         if [[ -e ${i} ]]; then
@@ -57,58 +69,58 @@ perform_backup() {
 }
 
 mac_backup() {
-    if [[ ! -d ${FOLDER} ]]; then
-        mkdir "${FOLDER}"
-    fi
-
     ARCHIVE=${SCRIPT_DIR}/${FOLDER}/${BOX}-${TIMESTAMP}.bz2
     archive
 }
 
 linux_backup() {
     if [[ ! -f "$HOME/.gdrive_token" ]]; then
-        echo "Google Drive token missing!"
-        exit 1
+        log "Google Drive token missing, creating local backup only..."
+        
+        ARCHIVE=${SCRIPT_DIR}/${FOLDER}/${BOX}-${TIMESTAMP}.bz2
+        archive
     else
-        GDRIVE_PARENT=$(cat "$HOME/.gdrive_token")
+        ARCHIVE=/tmp/${BOX}-${TIMESTAMP}.bz2
+        archive
+        gdrive_upload
     fi
+}
 
-    ARCHIVE=/tmp/${BOX}-${TIMESTAMP}.bz2
+gdrive_upload() {
+    GDRIVE_PARENT=$(cat "$HOME/.gdrive_token")
     MAX_ATTEMPTS=5
     ATTEMPT=0
     TIMEOUT=1
 
-    archive
-
     while [[ ${ATTEMPT} < ${MAX_ATTEMPTS} ]]; do
 
-        LOG_MSG=$(gdrive upload ${ARCHIVE} -p ${GDRIVE_PARENT})
+        LOG_MSG=$(gdrive upload "${ARCHIVE}" -p "${GDRIVE_PARENT}")
 
         if [[ $? -eq 0 ]]; then
             log "Backup file '${ARCHIVE}' successfully uploaded to Google Drive."
             break
         else
-            ATTEMPT=$(( ATTEMPT + 1 ))
+            ATTEMPT=$((ATTEMPT + 1))
             log "Google Drive upload returned an error on attempt ${ATTEMPT}, retrying in ${TIMEOUT} seconds."
             log "gdrive command output: ${LOG_MSG}"
             sleep ${TIMEOUT}
-            TIMEOUT=$(( TIMEOUT * 2 ))
+            TIMEOUT=$((TIMEOUT * 2))
         fi
 
     done
 
-    if [[ ${ATTEMPT} == ${MAX_ATTEMPTS} ]]; then
+    if [[ "${ATTEMPT}" == "${MAX_ATTEMPTS}" ]]; then
         log "Google Drive upload maximum number of attempts reached (${MAX_ATTEMPTS}), aborting!"
         exit 1
     fi
 
-    rm ${ARCHIVE}
+    rm "${ARCHIVE}"
 }
 
 ### Script Configuration
 LOGFILE=/tmp/gbackup.log
 FOLDER="Machines"
-ALLTARGETS="$HOME/.aws $HOME/.bash* $HOME/.chef $HOME/.gitconfig $HOME/.m2/settings* $HOME/.p10k.zsh $HOME/.profile $HOME/.ssh $HOME/.vimrc* $HOME/.zsh*"
+ALLTARGETS="$HOME/.aws $HOME/.bash* $HOME/.chef $HOME/.gitconfig $HOME/.m2/settings* $HOME/.p10k.zsh $HOME/.profile $HOME/.router_conf $HOME/.ssh $HOME/.vimrc* $HOME/.zsh*"
 
 ### Script start
 log "Execution started."
