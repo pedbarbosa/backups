@@ -6,7 +6,9 @@ require 'time'
 # Raise error if directory does not exist
 class DirectoryNotFound < StandardError
   def initialize(msg = 'Directory not found')
+    # rubocop:disable Style/SuperArguments
     super(msg)
+    # rubocop:enable Style/SuperArguments
   end
 end
 
